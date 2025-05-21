@@ -65,13 +65,33 @@ int main() {
     // Buffer local para leer el string +1 para el caracter nulo
     char buffer[DATA_SIZE + 1];
 
+    //---------------------
+    //Tuberia a fabrica
+    //---------------------
+
+    const char *tuberiaRobot2 = "/tmp/tuberiaRobot2";
+
+    int fdr2 = open(tuberiaRobot2, O_RDONLY);
+    if (fdr2 == -1) {
+        perror("Error: No se pudo abrir la tuberia para el robot 2.\n");
+        return 12;
+    }
+
+    // Leer N desde la tuberia
+    int N;
+    read(fdr2, &N, sizeof(N));
+    
+    close(fdr2);
+
+    printf("Robot 2: Recibido N = %d\n", N);
+
     //--------------------
     // Robot 1 empaca SOLO AC
     //--------------------
 
     int cp = 0; // Contador de productos empacados por el robot 1
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < N; i++) {
         sem_wait(semr2); // Esperar a que el productor haya escrito algo
 
         buffer[DATA_SIZE] = '\0'; // Anadir terminador nulo para imprimir como string
@@ -81,6 +101,9 @@ int main() {
         if (strcmp(buffer, "ZZ") == 0) { //Si se finaliza la producción
            
             printf("Producción terminada (ZZ)\n");
+
+            sem_post(semr3); // Avisar a robot 3 que hay un nuevo dato
+
             break; // Terminar si se recibe el string de terminacion
         
         }else { //Si los productos son AC actua
@@ -96,7 +119,7 @@ int main() {
             sleep(1); // Simular trabajo
     
             sem_post(semprod); // Avisar al productor que el slot esta libre
-            
+
         }
 
     }

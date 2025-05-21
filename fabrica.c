@@ -84,20 +84,12 @@ int main(int argc, char *argv[]) {
 
     if (productor == 0) { // HIJO: PRODUCTOR
 
-        // Cerrar extremo de escritura
-        close(fdTuberia[1]);
-        // Leer N desde la tuberia
-        int N;
-        read(fdTuberia[0], &N, sizeof(N));
-        // Cerrar extremo de lectura
-        close(fdTuberia[0]);
-
         //Nombres Semaforos
         const char *nomsemprod = "/SEMPROD";
         const char *nomsemr1 = "/SEMR1";
         const char *nomsemr2 = "/SEMR2";
         const char *nomsemr3 = "/SEMR3";
-
+        
         // Asegurarse de que los semaforos no existan previamente (para un inicio limpio)
         sem_unlink(nomsemprod);
         sem_unlink(nomsemr1);
@@ -109,19 +101,27 @@ int main(int argc, char *argv[]) {
         sem_t *semr1 = sem_open(nomsemr1, O_CREAT, 0666, 0);
         sem_t *semr2 = sem_open(nomsemr2, O_CREAT, 0666, 0);
         sem_t *semr3 = sem_open(nomsemr3, O_CREAT, 0666, 0);
-
+        
         // Verificar que los semaforos se hayan creado correctamente
         if (semprod == SEM_FAILED || semr1 == SEM_FAILED || semr2 == SEM_FAILED || semr3 == SEM_FAILED) {
             perror("Falla sem_open en productor");
             return 1;
         }
-
-    printf("Productor activo...\n");
-
-    srand(time(NULL)); // Inicializar la semilla para la generación de números aleatorios
-
-    // Lista de strings a producir
-    const char *productos[] = {"AB", "AC", "BC"};
+        
+        srand(time(NULL)); // Inicializar la semilla para la generación de números aleatorios
+        
+        // Lista de strings a producir
+        const char *productos[] = {"AB", "AC", "BC"};
+        
+        // Cerrar extremo de escritura
+        close(fdTuberia[1]);
+        // Leer N desde la tuberia
+        int N;
+        read(fdTuberia[0], &N, sizeof(N));
+        // Cerrar extremo de lectura
+        close(fdTuberia[0]);
+        
+        printf("Productor activo...\n");
 
     // Producir los strings de la lista
     for (int i = 0; i <N; i++) {
@@ -155,6 +155,7 @@ int main(int argc, char *argv[]) {
     printf("Producción terminada (ZZ)\n");
     
     sem_post(semr1); // Avisar a robot 1 que hay un nuevo dato
+    sem_wait(semprod); // Esperar a que todos lean la señal de terminacion
 
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE)<0) {
@@ -179,13 +180,6 @@ int main(int argc, char *argv[]) {
 
         //Inicialización de N a partir de la entrada
         int N = atoi(argv[1]);
-        
-        //Escribir en la tuberia
-        
-        close(fdTuberia[0]); // Cerrar el extremo de lectura
-        write(fdTuberia[1],&N,sizeof(N)); // Enviar N al hijo
-        
-        close(fdTuberia[1]); // Cerrar el extremo de escritura
 
         //----------------------------------------------------
         // Tuberias para los robots
@@ -214,6 +208,28 @@ int main(int argc, char *argv[]) {
             perror("Error: No se pudo crear la tuberia para el robot 3.\n");
             return 11;
         }
+
+        int fdr1 = open(tuberiaRobot1, O_WRONLY);
+        int fdr2 = open(tuberiaRobot2, O_WRONLY);
+        int fdr3 = open(tuberiaRobot3, O_WRONLY);
+
+        if (fdr1 == -1 || fdr2 == -1 || fdr3 == -1) {
+            perror("Error: No se pudo abrir la tuberia para el robot.\n");
+            return 12;
+        }
+
+        write(fdr1, &N, sizeof(N)); // Enviar N al robot 1
+        close(fdr1);
+        write(fdr2, &N, sizeof(N)); // Enviar N al robot 2
+        close(fdr2);
+        write(fdr3, &N, sizeof(N)); // Enviar N al robot 3
+        close(fdr3);
+
+        //Escribir en la tuberia para hijo (productor)
+        close(fdTuberia[0]); // Cerrar el extremo de lectura
+        write(fdTuberia[1],&N,sizeof(N)); // Enviar N al hijo
+        printf("Enviado N a productor: %d\n", N);
+        close(fdTuberia[1]); // Cerrar el extremo de escritura
 
         //------------------------------------------------
         // De acá para abajo debe ir el codigo que abre y lee de las tuberias (se necesita semaforos para coordinar)
