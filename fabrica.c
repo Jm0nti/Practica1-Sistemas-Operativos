@@ -225,11 +225,44 @@ int main(int argc, char *argv[]) {
         write(fdr3, &N, sizeof(N)); // Enviar N al robot 3
         close(fdr3);
 
+
         //Escribir en la tuberia para hijo (productor)
         close(fdTuberia[0]); // Cerrar el extremo de lectura
         write(fdTuberia[1],&N,sizeof(N)); // Enviar N al hijo
         printf("Enviado N a productor: %d\n", N);
         close(fdTuberia[1]); // Cerrar el extremo de escritura
+
+        // Recibir cp de los robots
+        int cp1, cp2, cp3;
+        fdr1 = open(tuberiaRobot1, O_RDONLY);
+        if (fdr1 == -1) {
+            perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
+            return 12;
+        }
+        read(fdr1, &cp1, sizeof(cp1)); // Recibir cp del robot 1
+        close(fdr1);
+
+        fdr2 = open(tuberiaRobot2, O_RDONLY);
+        if (fdr2 == -1) {
+            perror("Error: No se pudo abrir la tuberia para el robot 2.\n");
+            return 12;
+        }
+        read(fdr2, &cp2, sizeof(cp2)); // Recibir cp del robot 2
+        close(fdr2);
+
+        fdr3 = open(tuberiaRobot3, O_RDONLY);
+        if (fdr3 == -1) {
+            perror("Error: No se pudo abrir la tuberia para el robot 3.\n");
+            return 12;
+        }
+        read(fdr3, &cp3, sizeof(cp3)); // Recibir cp del robot 3
+        close(fdr3);
+
+        printf("Robot 1: Productos empacados: %d\n", cp1);
+        printf("Robot 2: Productos empacados: %d\n", cp2);
+        printf("Robot 3: Productos empacados: %d\n", cp3);
+        printf("Total productos empacados: %d\n", cp1 + cp2 + cp3);
+
 
         //------------------------------------------------
         // De acá para abajo debe ir el codigo que abre y lee de las tuberias (se necesita semaforos para coordinar)

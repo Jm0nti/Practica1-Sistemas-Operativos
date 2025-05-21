@@ -123,6 +123,18 @@ int main() {
 
     }
 
+    // Enviar cp a fabrica.c
+    fdr1 = open(tuberiaRobot1, O_WRONLY);
+    if (fdr1 == -1) {
+        perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
+        return 12;
+    }
+
+    
+    write(fdr1, &cp, sizeof(cp)); // Enviar cp al robot 1
+    close(fdr1); 
+    printf("Robot 1: Productos empacados: %d\n", cp);
+
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE) == -1) {
         perror("Falla munmap() en consumidor");
