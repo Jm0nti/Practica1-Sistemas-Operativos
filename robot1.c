@@ -12,7 +12,8 @@ int main() {
     const char *nomsemprod = "/SEMPROD";
     const char *nomsemr1 = "/SEMR1";
 
-    const int num_items_to_consume = 3; // HACER TUBERIA PARA LEER N DE fabrica.c
+    //const int num_items_to_consume = 3; // HACER TUBERIA PARA LEER N DE fabrica.c
+    /* ------- NO ENTIENDO ESA LINEA 15 (la de arriba), CREO QUE SOBRA  (?) ----------*/
 
     // Abrir semaforos 
     sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 0);
@@ -59,6 +60,12 @@ int main() {
     // Buffer local para leer el string +1 para el caracter nulo
     char buffer[DATA_SIZE + 1];
 
+    //--------------------
+    // Robot 1 empaca SOLO AB
+    //--------------------
+
+    int contadorRobot1 = 0; // Contador de productos empacados por el robot 1
+
     for (int i = 0; i < 6; i++) {
         sem_wait(semr1); // Esperar a que el productor haya escrito algo
 
@@ -66,16 +73,32 @@ int main() {
         memcpy(buffer, ptr, DATA_SIZE);
         buffer[DATA_SIZE] = '\0'; // Anadir terminador nulo para imprimir como string
 
-        printf("Leido: %s\n", buffer);
+        if (strcmp(buffer, "ZZ") == 0) { //Si se finaliza la producción
+           
+            printf("Producción terminada (ZZ)\n");
+            break; // Terminar si se recibe el string de terminacion
+        
+        }else if (strcmp(buffer,"AB") == 0){ //Si los productos son AC actua
+            
+            printf("Leido: %s\n", buffer);
+    
+            // "Eliminar" el contenido de la memoria compartida escribiendo ceros (o lo que desees)
+            // Esto es para cumplir con el requisito de "eliminarlo del espacio de memoria".
+            memset(ptr, 0, DATA_SIZE); 
+            // printf("Memoria compartida limpiada.\n"); // Para depuracion
+            
+            contadorRobot1++;
 
-        // "Eliminar" el contenido de la memoria compartida escribiendo ceros (o lo que desees)
-        // Esto es para cumplir con el requisito de "eliminarlo del espacio de memoria".
-        memset(ptr, 0, DATA_SIZE); 
-        // printf("Memoria compartida limpiada.\n"); // Para depuracion
+            sleep(1); // Simular trabajo
+    
+            sem_post(semprod); // Avisar al productor que el slot esta libre
 
-        sleep(1); // Simular trabajo
+        }else{ //Si los productos no son AC da paso a los demás robots
 
-        sem_post(semprod); // Avisar al productor que el slot esta libre
+            //ACÁ DEBE DORMIRSE Y DAR PASO A LOS OTROS ROBOTS, YA QUE LO QUE HAY EN LA CINTA NO ES DE ÉL.
+
+        }
+
     }
 
     // "Desmapear" el area de memoria

@@ -58,11 +58,9 @@ int main(int argc, char *argv[]) {
         // Cerrar extremo de lectura
         close(fdTuberia[0]);
 
-        // Lista de strings a producir
-        const char *productos[] = {"AB", "AC", "BC"};
         //int num_strings = 3;
-
-
+        
+        
         // Definiciones de memoria
         const char *path = "/CINTA";
         const int DATA_SIZE = sizeof(char)*2;
@@ -110,23 +108,25 @@ int main(int argc, char *argv[]) {
             fd,         // Descriptor de archivo
             0           // Offset
         );
-
+        
         if (ptr == MAP_FAILED) {
             perror("Falla mmap() en productor");
             return 3;
         }
-
+        
 
     printf("Productor activo...\n");
 
     srand(time(NULL)); // Inicializar la semilla para la generación de números aleatorios
 
+    // Lista de strings a producir
+    const char *productos[] = {"AB", "AC", "BC"};
 
     // Producir los strings de la lista
     for (int i = 0; i <N; i++) {
         int indice = rand() % 3;
         sem_wait(semprod); // Esperar a que el slot este libre (productor puede producir)
-
+        
         // Copiar el string actual a la memoria compartida
         memcpy(ptr, productos[indice], DATA_SIZE);
         
@@ -136,9 +136,17 @@ int main(int argc, char *argv[]) {
         printf("Producido: %.*s\n", DATA_SIZE, (char*)ptr);
         
         sleep(1); // Simular trabajo
-
+        
         sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
     }
+    
+    sem_wait(semprod); // Esperar a que el slot este libre (productor puede producir)
+    
+    memcpy(ptr,"ZZ", DATA_SIZE); // Escribir el string de terminacion
+    
+    printf("Producción terminada (ZZ)\n");
+    
+    sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
 
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE)<0) {
@@ -202,6 +210,38 @@ int main(int argc, char *argv[]) {
         write(fdTuberia[1],&N,sizeof(N)); // Enviar N al hijo
         
         close(fdTuberia[1]); // Cerrar el extremo de escritura
+
+        //----------------------------------------------------
+        // Tuberias para los robots
+        //----------------------------------------------------
+
+        const char *tuberiaRobot1 = "/tmp/tuberiaRobot1";
+        const char *tuberiaRobot2 = "/tmp/tuberiaRobot2";
+        const char *tuberiaRobot3 = "/tmp/tuberiaRobot3";
+
+        //eliminar si existen
+        unlink(tuberiaRobot1);
+        unlink(tuberiaRobot2);
+        unlink(tuberiaRobot3);
+
+        if(mkfifo(tuberiaRobot1, 0666) == -1){
+            perror("Error: No se pudo crear la tuberia para el robot 1.\n");
+            return 9;
+        }
+
+        if(mkfifo(tuberiaRobot2, 0666) == -1){
+            perror("Error: No se pudo crear la tuberia para el robot 2.\n");
+            return 10;
+        }
+
+        if(mkfifo(tuberiaRobot3, 0666) == -1){
+            perror("Error: No se pudo crear la tuberia para el robot 3.\n");
+            return 11;
+        }
+
+        //------------------------------------------------
+        // De acá para abajo debe ir el codigo que abre y lee de las tuberias (se necesita semaforos para coordinar)
+        //------------------------------------------------
         
         wait(NULL); // Espera al hijo
     }
