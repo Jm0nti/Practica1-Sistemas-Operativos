@@ -11,6 +11,7 @@ int main() {
     const int DATA_SIZE = sizeof(char)*2; // Debe ser el mismo tamano que en el productor
     const char *nomsemprod = "/SEMPROD";
     const char *nomsemr1 = "/SEMR1";
+    const char *nomsemr2 = "/SEMR2";
 
     //const int num_items_to_consume = 3; // HACER TUBERIA PARA LEER N DE fabrica.c
     /* ------- NO ENTIENDO ESA LINEA 15 (la de arriba), CREO QUE SOBRA  (?) ----------*/
@@ -18,8 +19,9 @@ int main() {
     // Abrir semaforos 
     sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 0);
     sem_t *semr1 = sem_open(nomsemr1, O_CREAT, 0666, 0);
+    sem_t *semr2 = sem_open(nomsemr2, O_CREAT, 0666, 0);
 
-    if (semprod == SEM_FAILED || semr1 == SEM_FAILED) {
+    if (semprod == SEM_FAILED || semr1 == SEM_FAILED || semr2 == SEM_FAILED) {
         perror("Falla sem_open en consumidor");
         return 1;
     }
@@ -33,6 +35,7 @@ int main() {
         perror("Falla shm_open() en consumidor");
         sem_close(semprod);
         sem_close(semr1);
+        sem_close(semr2);
         return 1;
     }
 
@@ -52,6 +55,7 @@ int main() {
         close(fd);
         sem_close(semprod);
         sem_close(semr1);
+        sem_close(semr2);
         return 3;
     }
 
@@ -64,38 +68,33 @@ int main() {
     // Robot 1 empaca SOLO AB
     //--------------------
 
-    int contadorRobot1 = 0; // Contador de productos empacados por el robot 1
+    int cp = 0; // Contador de productos empacados por el robot 1
 
     for (int i = 0; i < 6; i++) {
         sem_wait(semr1); // Esperar a que el productor haya escrito algo
 
+        buffer[DATA_SIZE] = '\0'; // Anadir terminador nulo para imprimir como string
         // Copiar los datos de la memoria compartida al buffer local
         memcpy(buffer, ptr, DATA_SIZE);
-        buffer[DATA_SIZE] = '\0'; // Anadir terminador nulo para imprimir como string
 
         if (strcmp(buffer, "ZZ") == 0) { //Si se finaliza la producción
            
             printf("Producción terminada (ZZ)\n");
             break; // Terminar si se recibe el string de terminacion
         
-        }else if (strcmp(buffer,"AB") == 0){ //Si los productos son AC actua
+        }else{ //Si los productos son AB actua
             
             printf("Leido: %s\n", buffer);
     
+            cp++;
             // "Eliminar" el contenido de la memoria compartida escribiendo ceros (o lo que desees)
             // Esto es para cumplir con el requisito de "eliminarlo del espacio de memoria".
             memset(ptr, 0, DATA_SIZE); 
             // printf("Memoria compartida limpiada.\n"); // Para depuracion
-            
-            contadorRobot1++;
 
             sleep(1); // Simular trabajo
     
             sem_post(semprod); // Avisar al productor que el slot esta libre
-
-        }else{ //Si los productos no son AC da paso a los demás robots
-
-            //ACÁ DEBE DORMIRSE Y DAR PASO A LOS OTROS ROBOTS, YA QUE LO QUE HAY EN LA CINTA NO ES DE ÉL.
 
         }
 
@@ -114,6 +113,7 @@ int main() {
     // Cerrar los semaforos
     sem_close(semprod);
     sem_close(semr1);
+    sem_close(semr2);
 
     printf("Consumidor terminado.\n");
     return 0;

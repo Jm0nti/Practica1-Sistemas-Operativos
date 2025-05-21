@@ -48,34 +48,33 @@ int main(int argc, char *argv[]) {
     // Creación de memoria compartida
     //-----------------------------------------------------
 
-        // Definiciones de memoria
-        const char *path = "/CINTA";
-        const int DATA_SIZE = sizeof(char)*2;
+    // Definiciones de memoria
+    const char *path = "/CINTA";
+    const int DATA_SIZE = sizeof(char)*2;
 
-        // Descriptores de archivo del area de memoria compartida
-        int fdMemoria;
-        // Puntero al area de memoria compartida
-        void *ptr;
-        // Eliminar la memoria compartida si ya existe
-        shm_unlink(path);
-        
-        // Crear la memoria compartida
-        fdMemoria = shm_open(path, O_CREAT | O_RDWR, 0666);
-        if (fdMemoria == -1) {
+    // Descriptores de archivo del area de memoria compartida
+    int fdMemoria;
+    // Puntero al area de memoria compartida
+    void *ptr;
+    // Eliminar la memoria compartida si ya existe
+    shm_unlink(path);
+    
+    // Crear la memoria compartida
+    fdMemoria = shm_open(path, O_CREAT | O_RDWR, 0666);
+    if (fdMemoria == -1) {
             perror("Error: No se pudo crear la memoria compartida.\n");
             return 6;
         }
         
-        // Configurar el tamaño de la memoria compartida
-        if (ftruncate(fdMemoria, DATA_SIZE) == -1) {
+    // Configurar el tamaño de la memoria compartida
+    if (ftruncate(fdMemoria, DATA_SIZE) == -1) {
             perror("Error: No se pudo configurar el tamaño de la memoria compartida.\n");
             return 7;
         }
         
-        // Mapear la memoria compartida
-        
-        ptr = mmap(0, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fdMemoria, 0);
-        if (ptr == MAP_FAILED) {
+    // Mapear la memoria compartida
+    ptr = mmap(0, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fdMemoria, 0);
+    if (ptr == MAP_FAILED) {
             perror("Error: No se pudo mapear la memoria compartida.\n");
             return 8;
         }
@@ -96,16 +95,23 @@ int main(int argc, char *argv[]) {
         //Nombres Semaforos
         const char *nomsemprod = "/SEMPROD";
         const char *nomsemr1 = "/SEMR1";
+        const char *nomsemr2 = "/SEMR2";
+        const char *nomsemr3 = "/SEMR3";
 
         // Asegurarse de que los semaforos no existan previamente (para un inicio limpio)
         sem_unlink(nomsemprod);
         sem_unlink(nomsemr1);
+        sem_unlink(nomsemr2);
+        sem_unlink(nomsemr3);
 
         // Crear semaforos
         sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 1);
         sem_t *semr1 = sem_open(nomsemr1, O_CREAT, 0666, 0);
+        sem_t *semr2 = sem_open(nomsemr2, O_CREAT, 0666, 0);
+        sem_t *semr3 = sem_open(nomsemr3, O_CREAT, 0666, 0);
 
-        if (semprod == SEM_FAILED || semr1 == SEM_FAILED) {
+        // Verificar que los semaforos se hayan creado correctamente
+        if (semprod == SEM_FAILED || semr1 == SEM_FAILED || semr2 == SEM_FAILED || semr3 == SEM_FAILED) {
             perror("Falla sem_open en productor");
             return 1;
         }
@@ -131,8 +137,15 @@ int main(int argc, char *argv[]) {
         printf("Producido: %.*s\n", DATA_SIZE, (char*)ptr);
         
         sleep(1); // Simular trabajo
+
+        if (productos[indice] == "AB") {
+            sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
+        } else if (productos[indice] == "AC") {
+            sem_post(semr2); // Avisar al consumidor que hay un nuevo dato
+        } else if (productos[indice] == "BC") {
+            sem_post(semr3); // Avisar al consumidor que hay un nuevo dato
+        }
         
-        sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
     }
     
     sem_wait(semprod); // Esperar a que el slot este libre (productor puede producir)
@@ -141,7 +154,7 @@ int main(int argc, char *argv[]) {
     
     printf("Producción terminada (ZZ)\n");
     
-    sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
+    sem_post(semr1); // Avisar a robot 1 que hay un nuevo dato
 
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE)<0) {
@@ -157,6 +170,8 @@ int main(int argc, char *argv[]) {
     // Cerrar los semaforos
     sem_close(semprod);
     sem_close(semr1);
+    sem_close(semr2);
+    sem_close(semr3);
 
     printf("Productor terminado.\n");
 
