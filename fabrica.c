@@ -44,7 +44,42 @@ int main(int argc, char *argv[]) {
         printf("Tuberia creada correctamente.\n");
     }
 
+    //-----------------------------------------------------
+    // Creación de memoria compartida
+    //-----------------------------------------------------
 
+        // Definiciones de memoria
+        const char *path = "/CINTA";
+        const int DATA_SIZE = sizeof(char)*2;
+
+        // Descriptores de archivo del area de memoria compartida
+        int fdMemoria;
+        // Puntero al area de memoria compartida
+        void *ptr;
+        // Eliminar la memoria compartida si ya existe
+        shm_unlink(path);
+        
+        // Crear la memoria compartida
+        fdMemoria = shm_open(path, O_CREAT | O_RDWR, 0666);
+        if (fdMemoria == -1) {
+            perror("Error: No se pudo crear la memoria compartida.\n");
+            return 6;
+        }
+        
+        // Configurar el tamaño de la memoria compartida
+        if (ftruncate(fdMemoria, DATA_SIZE) == -1) {
+            perror("Error: No se pudo configurar el tamaño de la memoria compartida.\n");
+            return 7;
+        }
+        
+        // Mapear la memoria compartida
+        
+        ptr = mmap(0, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fdMemoria, 0);
+        if (ptr == MAP_FAILED) {
+            perror("Error: No se pudo mapear la memoria compartida.\n");
+            return 8;
+        }
+        
     // Crear proceso productor
     pid_t productor = fork();
 
@@ -57,14 +92,6 @@ int main(int argc, char *argv[]) {
         read(fdTuberia[0], &N, sizeof(N));
         // Cerrar extremo de lectura
         close(fdTuberia[0]);
-
-        //int num_strings = 3;
-        
-        
-        // Definiciones de memoria
-        const char *path = "/CINTA";
-        const int DATA_SIZE = sizeof(char)*2;
-
 
         //Nombres Semaforos
         const char *nomsemprod = "/SEMPROD";
@@ -81,39 +108,7 @@ int main(int argc, char *argv[]) {
         if (semprod == SEM_FAILED || semr1 == SEM_FAILED) {
             perror("Falla sem_open en productor");
             return 1;
-    }
-
-        // Garantizar que el recurso de memoria compartida se cree vacio
-        shm_unlink(path);
-
-        // Crear area de memoria compartida
-        int fd = shm_open(path, O_RDWR | O_CREAT, 0666);
-        if (fd < 0) {
-            perror("Falla shm_open() en productor");
-            return 1;
         }
-
-        // Especificar el tamano del espacio de memoria creado
-        if (ftruncate(fd, DATA_SIZE)<0) {
-            perror("Falla ftruncate() en productor");
-            return 2;
-        }
-
-        // Mapear la memoria compartida al espacio de direcciones del proceso
-        void *ptr = mmap(
-            NULL,
-            DATA_SIZE,
-            PROT_WRITE, // Productor escribe
-            MAP_SHARED, // Memoria compartida
-            fd,         // Descriptor de archivo
-            0           // Offset
-        );
-        
-        if (ptr == MAP_FAILED) {
-            perror("Falla mmap() en productor");
-            return 3;
-        }
-        
 
     printf("Productor activo...\n");
 
@@ -155,7 +150,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Cerrar el descriptor de archivo de la memoria compartida
-    if (close(fd)<0) {
+    if (close(fdMemoria)<0) {
         perror("Falla close(fd) en productor");
     }
 
@@ -163,44 +158,10 @@ int main(int argc, char *argv[]) {
     sem_close(semprod);
     sem_close(semr1);
 
-
     printf("Productor terminado.\n");
-
 
     } else if (productor > 0) { // PROCESO PADRE
 
-        // Definiciones de memoria
-        const char *path = "/CINTA";
-        const int DATA_SIZE = sizeof(char)*2;
-
-        // Descriptores de archivo del area de memoria compartida
-        int fdMemoria;
-        // Puntero al area de memoria compartida
-        void *ptr;
-        // Eliminar la memoria compartida si ya existe
-        shm_unlink(path);
-        
-        // Crear la memoria compartida
-        fdMemoria = shm_open(path, O_CREAT | O_RDWR, 0666);
-        if (fdMemoria == -1) {
-            perror("Error: No se pudo crear la memoria compartida.\n");
-            return 6;
-        }
-        
-        // Configurar el tamaño de la memoria compartida
-        if (ftruncate(fdMemoria, DATA_SIZE) == -1) {
-            perror("Error: No se pudo configurar el tamaño de la memoria compartida.\n");
-            return 7;
-        }
-        
-        // Mapear la memoria compartida
-        
-        ptr = mmap(0, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fdMemoria, 0);
-        if (ptr == MAP_FAILED) {
-            perror("Error: No se pudo mapear la memoria compartida.\n");
-            return 8;
-        }
-        
         //Inicialización de N a partir de la entrada
         int N = atoi(argv[1]);
         
@@ -245,7 +206,6 @@ int main(int argc, char *argv[]) {
         
         wait(NULL); // Espera al hijo
     }
-
 
     return 0;
 }
