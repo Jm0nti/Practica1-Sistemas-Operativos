@@ -5,119 +5,207 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <time.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <semaphore.h>
 
 int main(int argc, char *argv[]) {
 
-    int N;
-    char *productos[3] = {"AB", "AC", "BC"};
-    // indice para obtener producto aleatorio
-    int indice;
-    // Inicializamos producidos con un tamaño de N
-    char **producidos = malloc(sizeof(char*) * N);
-    
-
-    // Verificación de entrada
+    // Verificacion entrada de N
     if (argc != 2) {
         perror("Error: Debe proporcionar N.\n");
         return 1;
     }
 
-    // Verificacion de que N es digito
-    if (!isdigit(argv[1][0])) {
-        perror("Error: N debe ser un número entero.\n");
-        return 2;
-    }
-
-    N = atoi(argv[1]);
-
-    // Verificacion de que N es positivo
-    if (N <= 0) {
-        perror("Error: N debe ser un número entero positivo.\n");
-        return 3;
+    // Verificacion de que N es digito y positivo
+    for (int i = 0; argv[1][i] != '\0'; i++) {
+        if (!isdigit(argv[1][i])) {
+            perror("Error: N debe ser un número entero.\n");
+            return 2;
+        }
     }
 
     // Verificacion de que N es par
-    if (N % 2 != 0) {
+    if (atoi(argv[1]) % 2 != 0) {
         perror("Error: N debe ser un número par.\n");
         return 4;
     }
 
-    // Descriptores de lectura y escritura tuberia anonima
-    int fd[2];
+    printf("N validado correctamente.\n");
 
-    if (pipe(fd)<0) {
+    // Descriptores de lectura y escritura tuberia anonima
+    int fdTuberia[2];
+    if (pipe(fdTuberia) < 0) {
         perror("Fallo de pipe al crear tuberia.\n");
-        return 1;
+        return 5;
     } else {
         printf("Tuberia creada correctamente.\n");
     }
 
-    // Creacion de proceso productor
+
+    // Crear proceso productor
     pid_t productor = fork();
 
-    if (productor < 0) {
-        perror("Error: No se pudo crear el proceso.\n");
-        return 5;
+    if (productor == 0) { // HIJO: PRODUCTOR
+
+        // Cerrar extremo de escritura
+        close(fdTuberia[1]);
+        // Leer N desde la tuberia
+        int N;
+        read(fdTuberia[0], &N, sizeof(N));
+        // Cerrar extremo de lectura
+        close(fdTuberia[0]);
+
+        // Lista de strings a producir
+        const char *productos[] = {"AB", "AC", "BC"};
+        //int num_strings = 3;
+
+
+        // Definiciones de memoria
+        const char *path = "/CINTA";
+        const int DATA_SIZE = sizeof(char)*2;
+
+
+        //Nombres Semaforos
+        const char *nomsemprod = "/SEMPROD";
+        const char *nomsemr1 = "/SEMR1";
+
+        // Asegurarse de que los semaforos no existan previamente (para un inicio limpio)
+        sem_unlink(nomsemprod);
+        sem_unlink(nomsemr1);
+
+        // Crear semaforos
+        sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 1);
+        sem_t *semr1 = sem_open(nomsemr1, O_CREAT, 0666, 0);
+
+        if (semprod == SEM_FAILED || semr1 == SEM_FAILED) {
+            perror("Falla sem_open en productor");
+            return 1;
     }
 
-    if (productor == 0) { // Hijo: productor
-        srand(time(NULL));
+        // Garantizar que el recurso de memoria compartida se cree vacio
+        shm_unlink(path);
 
-        // Reasignamos memoria para anadir ZZ al final
-        char **temp = realloc(producidos, sizeof(char*) * (N + 1)); // +1 para "ZZ"
-        if (temp == NULL) {
-            perror("Error: No se pudo reasignar memoria.");
-            free(producidos); // Liberar memoria
+        // Crear area de memoria compartida
+        int fd = shm_open(path, O_RDWR | O_CREAT, 0666);
+        if (fd < 0) {
+            perror("Falla shm_open() en productor");
             return 1;
         }
-        producidos = temp;
 
-        for (int i = 0; i < N; i++) {
-            indice = rand() % 3;
-            printf("Produciendo %s\n", productos[indice]);
-            producidos[i] = productos[indice]; // Guardar string
-            sleep(1);
+        // Especificar el tamano del espacio de memoria creado
+        if (ftruncate(fd, DATA_SIZE)<0) {
+            perror("Falla ftruncate() en productor");
+            return 2;
         }
 
-        producidos[N] = "ZZ"; // Agregar ZZ como último
+        // Mapear la memoria compartida al espacio de direcciones del proceso
+        void *ptr = mmap(
+            NULL,
+            DATA_SIZE,
+            PROT_WRITE, // Productor escribe
+            MAP_SHARED, // Memoria compartida
+            fd,         // Descriptor de archivo
+            0           // Offset
+        );
+
+        if (ptr == MAP_FAILED) {
+            perror("Falla mmap() en productor");
+            return 3;
+        }
+
+
+    printf("Productor activo...\n");
+
+    srand(time(NULL)); // Inicializar la semilla para la generación de números aleatorios
+
+
+    // Producir los strings de la lista
+    for (int i = 0; i <N; i++) {
+        int indice = rand() % 3;
+        sem_wait(semprod); // Esperar a que el slot este libre (productor puede producir)
+
+        // Copiar el string actual a la memoria compartida
+        memcpy(ptr, productos[indice], DATA_SIZE);
         
-        // Verificacion asignacion de memoria a producidos
-        if (producidos == NULL) {
-            perror("Error: No se pudo asignar memoria inicial a producidos.\n");
-            return 1;
-        }
-
-        // Debugging: Imprimir contenido de cinta
-        printf("Contenido de la cinta:\n");
-        for (int i = 0; i <= N; i++) {
-            printf("- %s\n", producidos[i]);
-        }
-
-        // Enviar producidos a la tuberia
-        write(fd[1], producidos, sizeof(char*) * (N + 1));
-
-        free(producidos); // liberar memoria
-        exit(0);
+        // Usamos %.*s para imprimir exactamente SHM_DATA_SIZE caracteres desde ptr,
+        // ya que ptr no necesariamente estara terminado en null si SHM_DATA_SIZE
+        // es exactamente la longitud del string sin el terminador.
+        printf("Producido: %.*s\n", DATA_SIZE, (char*)ptr);
         
-    } else { // Padre: consumidor
-        // Leer de la tuberia
-        char **cinta = malloc(sizeof(char*) * (N + 1));
-        if (cinta == NULL) {
-            perror("Error: No se pudo asignar memoria a cinta.\n");
-            return 1;
-        } 
-        read(fd[0], cinta, sizeof(char*) * (N + 1));   
-        // Debugging: Imprimir contenido de cinta desde padre
-        printf("Contenido de la cinta desde el padre:\n");
-        for (int i = 0; i <= N; i++) {
-            printf("- %s\n", cinta[i]);
+        sleep(1); // Simular trabajo
+
+        sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
+    }
+
+    // "Desmapear" el area de memoria
+    if (munmap(ptr, DATA_SIZE)<0) {
+        perror("Falla munmap() en productor");
+        // Continuar para cerrar y desvincular recursos
+    }
+
+    // Cerrar el descriptor de archivo de la memoria compartida
+    if (close(fd)<0) {
+        perror("Falla close(fd) en productor");
+    }
+
+    // Cerrar los semaforos
+    sem_close(semprod);
+    sem_close(semr1);
+
+
+    printf("Productor terminado.\n");
+
+
+    } else if (productor > 0) { // PROCESO PADRE
+
+        // Definiciones de memoria
+        const char *path = "/CINTA";
+        const int DATA_SIZE = sizeof(char)*2;
+
+        // Descriptores de archivo del area de memoria compartida
+        int fdMemoria;
+        // Puntero al area de memoria compartida
+        void *ptr;
+        // Eliminar la memoria compartida si ya existe
+        shm_unlink(path);
+        
+        // Crear la memoria compartida
+        fdMemoria = shm_open(path, O_CREAT | O_RDWR, 0666);
+        if (fdMemoria == -1) {
+            perror("Error: No se pudo crear la memoria compartida.\n");
+            return 6;
         }
+        
+        // Configurar el tamaño de la memoria compartida
+        if (ftruncate(fdMemoria, DATA_SIZE) == -1) {
+            perror("Error: No se pudo configurar el tamaño de la memoria compartida.\n");
+            return 7;
+        }
+        
+        // Mapear la memoria compartida
+        
+        ptr = mmap(0, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fdMemoria, 0);
+        if (ptr == MAP_FAILED) {
+            perror("Error: No se pudo mapear la memoria compartida.\n");
+            return 8;
+        }
+        
+        //Inicialización de N a partir de la entrada
+        int N = atoi(argv[1]);
+        
+        //Escribir en la tuberia
+        
+        close(fdTuberia[0]); // Cerrar el extremo de lectura
+        write(fdTuberia[1],&N,sizeof(N)); // Enviar N al hijo
+        
+        close(fdTuberia[1]); // Cerrar el extremo de escritura
+        
         wait(NULL); // Espera al hijo
     }
 
-    // Cerrar descriptores de archivos tuberia
-    close(fd[1]); 
-    close(fd[0]); 
-    
+
     return 0;
 }
