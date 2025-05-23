@@ -44,9 +44,7 @@ int main(int argc, char *argv[]) {
         printf("Tuberia creada correctamente.\n");
     }
 
-    //-----------------------------------------------------
-    // Creación de memoria compartida
-    //-----------------------------------------------------
+    // Creacion de memoria compartida
 
     // Definiciones de memoria
     const char *path = "/CINTA";
@@ -131,8 +129,8 @@ int main(int argc, char *argv[]) {
         // Copiar el string actual a la memoria compartida
         memcpy(ptr, productos[indice], DATA_SIZE);
         
-        // Usamos %.*s para imprimir exactamente SHM_DATA_SIZE caracteres desde ptr,
-        // ya que ptr no necesariamente estara terminado en null si SHM_DATA_SIZE
+        // Usamos %.*s para imprimir exactamente DATA_SIZE caracteres desde ptr,
+        // ya que ptr no necesariamente estara terminado en null si DATA_SIZE
         // es exactamente la longitud del string sin el terminador.
         printf("Producido: %.*s\n", DATA_SIZE, (char*)ptr);
         
@@ -264,11 +262,6 @@ int main(int argc, char *argv[]) {
         printf("Robot 2: Productos empacados: %d\n", cp2);
         printf("Robot 3: Productos empacados: %d\n", cp3);
         printf("Total productos empacados: %d\n", cp1 + cp2 + cp3);
-
-
-        //------------------------------------------------
-        // De acá para abajo debe ir el codigo que abre y lee de las tuberias (se necesita semaforos para coordinar)
-        //------------------------------------------------
         
         wait(NULL); // Espera al hijo
     }
