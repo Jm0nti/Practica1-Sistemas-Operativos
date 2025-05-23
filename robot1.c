@@ -7,30 +7,32 @@
 #include <semaphore.h>
 
 int main() {
+    // Definiciones de memoria
     const char *path = "/CINTA";
-    const int DATA_SIZE = sizeof(char)*2; 
+    const int DATA_SIZE = sizeof(char)*2;
+    
+    //Nombre de los semáforos
     const char *nomsemprod = "/SEMPROD";
     const char *nomsemr1 = "/SEMR1";
     const char *nomsemr2 = "/SEMR2";
 
-
-    // Abrir semaforos 
+    // Abrir semáforos 
     sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 0);
     sem_t *semr1 = sem_open(nomsemr1, O_CREAT, 0666, 0);
     sem_t *semr2 = sem_open(nomsemr2, O_CREAT, 0666, 0);
 
     if (semprod == SEM_FAILED || semr1 == SEM_FAILED || semr2 == SEM_FAILED) {
-        perror("Falla sem_open en consumidor");
+        perror("Falla sem_open en robot");
         return 1;
     }
 
-    // El consumidor NO hace shm_unlink() al inicio.
+    // Nota: el robot NO ejecuta shm_unlink().
 
-    // Abrir el area de memoria compartida 
-    // Usamos O_RDWR porque el consumidor va a leer y luego "eliminar" (escribir)
+    // Abrir el área de memoria compartida 
+    // Usamos O_RDWR porque el robot va a leer y luego "eliminar" (escribir)
     int fd = shm_open(path, O_RDWR, 0666);
     if (fd < 0) {
-        perror("Falla shm_open() en consumidor");
+        perror("Falla shm_open() en robot");
         sem_close(semprod);
         sem_close(semr1);
         sem_close(semr2);
@@ -42,22 +44,20 @@ int main() {
     void *ptr = mmap(
         NULL,
         DATA_SIZE,
-        PROT_READ | PROT_WRITE, // Consumidor lee y escribe para limpiar
+        PROT_READ | PROT_WRITE, // Robot lee y escribe para limpiar
         MAP_SHARED,
         fd,
         0
     );
 
     if (ptr == MAP_FAILED) {
-        perror("Falla mmap() en consumidor");
+        perror("Falla mmap() en robot");
         close(fd);
         sem_close(semprod);
         sem_close(semr1);
         sem_close(semr2);
         return 3;
     }
-
-    printf("Consumidor activo...\n");
 
     // Buffer local para leer el string +1 para el caracter nulo
     char buffer[DATA_SIZE + 1];
@@ -70,42 +70,46 @@ int main() {
 
     int fdr1 = open(tuberiaRobot1, O_RDONLY);
     if (fdr1 == -1) {
-        perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
+        perror("Error: No se pudo abrir la tubería para el robot 1.\n");
         return 4;
     }
 
-    // Leer N desde la tuberia
+    // Leer N desde la tubería
     int N;
     read(fdr1, &N, sizeof(N));
     
     close(fdr1);
-
+    
     printf("Robot 1: Recibido N = %d\n", N);
+    
+    printf("Robot 1 activo...\n");
 
-    //--------------------
+    //------------------------
     // Robot 1 empaca SOLO AB
-    //--------------------
+    //------------------------
 
     int cp = 0; // Contador de productos empacados por el robot 1
 
     for (int i = 0; i < N; i++) {
         sem_wait(semr1); // Esperar a que el productor haya escrito algo
 
-        buffer[DATA_SIZE] = '\0'; // Anadir terminador nulo para imprimir como string
+        buffer[DATA_SIZE] = '\0'; // Añadir carácter terminador nulo para imprimir como string
+        
         // Copiar los datos de la memoria compartida al buffer local
         memcpy(buffer, ptr, DATA_SIZE);
 
         if (strcmp(buffer, "ZZ") == 0) { //Si se finaliza la producción
            
             printf("Producción terminada (ZZ)\n");
-
-            sem_post(semr2);
-
-            break; // Terminar si se recibe el string de terminacion
-        
-        }else{ //Si los productos son AB actua
             
-            printf("Leido: %s\n", buffer);
+            // Avisar al robot 2 que hay un nuevo dato, no se elimina la información (robot 2 lee la señal de terminación)
+            sem_post(semr2); 
+
+            break; // Terminar despúes de recibir el string de terminación
+        
+        }else{ //Si los productos son AB, actúa
+            
+            printf("Empacado: %s\n", buffer);
     
             cp++;
 
@@ -113,7 +117,7 @@ int main() {
 
             sleep(1); 
     
-            sem_post(semprod); // Avisar al productor que el slot esta libre
+            sem_post(semprod); // Avisar al productor que el espacio de memoria esta libre
 
         }
 
@@ -122,32 +126,31 @@ int main() {
     // Enviar cp a fabrica.c
     fdr1 = open(tuberiaRobot1, O_WRONLY);
     if (fdr1 == -1) {
-        perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
+        perror("Error: No se pudo abrir la tubería para el robot 1.\n");
         return 5;
     }
-
     
-    write(fdr1, &cp, sizeof(cp)); // Enviar cp al robot 1
+    write(fdr1, &cp, sizeof(cp)); // Enviar cp al proceso padre (fabrica)
     close(fdr1); 
     printf("Robot 1: Productos empacados: %d\n", cp);
 
-    // "Desmapear" el area de memoria
+    // "Desmapear" el área de memoria
     if (munmap(ptr, DATA_SIZE) == -1) {
-        perror("Falla munmap() en consumidor");
+        perror("Falla munmap() en robot");
         return 6;
     }
 
     // Cerrar el descriptor de archivo
     if (close(fd) == -1) {
-        perror("Falla close(fd) en consumidor");
+        perror("Falla close(fd) en robot");
         return 7;
     }
 
-    // Cerrar los semaforos
+    // Cerrar los semáforos
     sem_close(semprod);
     sem_close(semr1);
     sem_close(semr2);
 
-    printf("Consumidor terminado.\n");
+    printf("Robot 1 termina.\n");
     return 0;
 }

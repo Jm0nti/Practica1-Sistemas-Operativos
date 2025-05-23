@@ -13,21 +13,25 @@
 
 int main(int argc, char *argv[]) {
 
-    // Verificacion entrada de N
+    //-------------------------------------
+    // Validación del N
+    //-------------------------------------
+
+    // Verificación entrada de N
     if (argc != 2) {
         perror("Error: Debe proporcionar N.\n");
         return 1;
     }
 
-    // Verificacion de que N es digito y positivo
+    // Verificación de que N es digito y positivo
     for (int i = 0; argv[1][i] != '\0'; i++) {
         if (!isdigit(argv[1][i])) {
-            perror("Error: N debe ser un número entero.\n");
+            perror("Error: N debe ser un número entero y positivo.\n");
             return 2;
         }
     }
 
-    // Verificacion de que N es par
+    // Verificación de que N es par
     if (atoi(argv[1]) % 2 != 0) {
         perror("Error: N debe ser un número par.\n");
         return 3;
@@ -35,16 +39,18 @@ int main(int argc, char *argv[]) {
 
     printf("N validado correctamente.\n");
 
-    // Descriptores de lectura y escritura tuberia anonima
+    // Descriptores de lectura y escritura tubería anonima
     int fdTuberia[2];
     if (pipe(fdTuberia) < 0) {
-        perror("Fallo de pipe al crear tuberia.\n");
+        perror("Fallo de pipe al crear tubería.\n");
         return 4;
     } else {
         printf("Tuberia creada correctamente.\n");
     }
 
-    // Creacion de memoria compartida
+    //----------------------------------------------------
+    // Creación de memoria compartida
+    //----------------------------------------------------
 
     // Definiciones de memoria
     const char *path = "/CINTA";
@@ -76,31 +82,38 @@ int main(int argc, char *argv[]) {
             perror("Error: No se pudo mapear la memoria compartida.\n");
             return 7;
         }
-        
-    // Crear proceso productor
+    
+    //-------------------------------------
+    // Creación proceso productor
+    //-------------------------------------
+
     pid_t productor = fork();
 
     if (productor == 0) { // HIJO: PRODUCTOR
 
-        //Nombres Semaforos
+        //-------------------------------------
+        // Semáforos
+        //-------------------------------------
+
+        //Nombres semáforos
         const char *nomsemprod = "/SEMPROD";
         const char *nomsemr1 = "/SEMR1";
         const char *nomsemr2 = "/SEMR2";
         const char *nomsemr3 = "/SEMR3";
         
-        // Asegurarse de que los semaforos no existan previamente (para un inicio limpio)
+        // Asegurarse de que los semáforos no existan previamente (para un inicio limpio)
         sem_unlink(nomsemprod);
         sem_unlink(nomsemr1);
         sem_unlink(nomsemr2);
         sem_unlink(nomsemr3);
 
-        // Crear semaforos
+        // Crear semáforos
         sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 1);
         sem_t *semr1 = sem_open(nomsemr1, O_CREAT, 0666, 0);
         sem_t *semr2 = sem_open(nomsemr2, O_CREAT, 0666, 0);
         sem_t *semr3 = sem_open(nomsemr3, O_CREAT, 0666, 0);
         
-        // Verificar que los semaforos se hayan creado correctamente
+        // Verificar que los semáforos se hayan creado correctamente
         if (semprod == SEM_FAILED || semr1 == SEM_FAILED || semr2 == SEM_FAILED || semr3 == SEM_FAILED) {
             perror("Falla sem_open en productor");
             return 8;
@@ -111,9 +124,13 @@ int main(int argc, char *argv[]) {
         // Lista de strings a producir
         const char *productos[] = {"AB", "AC", "BC"};
         
+        //-------------------------------------------
+        // Recibimiento de N desde el proceso padre
+        //-------------------------------------------
+
         // Cerrar extremo de escritura
         close(fdTuberia[1]);
-        // Leer N desde la tuberia
+        // Leer N desde la tubería
         int N;
         read(fdTuberia[0], &N, sizeof(N));
         // Cerrar extremo de lectura
@@ -124,42 +141,43 @@ int main(int argc, char *argv[]) {
     // Producir los strings de la lista
     for (int i = 0; i <N; i++) {
         int indice = rand() % 3;
-        sem_wait(semprod); // Esperar a que el slot este libre (productor puede producir)
+        sem_wait(semprod); // Esperar a que el espacio de memoria compartida esté libre (productor puede producir)
         
         // Copiar el string actual a la memoria compartida
         memcpy(ptr, productos[indice], DATA_SIZE);
         
         // Usamos %.*s para imprimir exactamente DATA_SIZE caracteres desde ptr,
-        // ya que ptr no necesariamente estara terminado en null si DATA_SIZE
-        // es exactamente la longitud del string sin el terminador.
+        // ya que ptr no necesariamente estará terminado en null si DATA_SIZE
+        // es exactamente la longitud del string sin el terminador ('\0').
         printf("Producido: %.*s\n", DATA_SIZE, (char*)ptr);
         
         sleep(1); // Simular trabajo
 
         if (productos[indice] == "AB") {
-            sem_post(semr1); // Avisar al consumidor que hay un nuevo dato
+            sem_post(semr1); // Avisar al robot1 que hay un nuevo dato para él
         } else if (productos[indice] == "AC") {
-            sem_post(semr2); // Avisar al consumidor que hay un nuevo dato
+            sem_post(semr2); // Avisar al robot2 que hay un nuevo dato para él
         } else if (productos[indice] == "BC") {
-            sem_post(semr3); // Avisar al consumidor que hay un nuevo dato
+            sem_post(semr3); // Avisar al robot3 que hay un nuevo dato para él
         }
         
     }
     
-    sem_wait(semprod); // Esperar a que el slot este libre (productor puede producir)
+    sem_wait(semprod); // Esperar a que el espacio de memoria compartida esté libre (productor puede producir)
     
-    memcpy(ptr,"ZZ", DATA_SIZE); // Escribir el string de terminacion
+    memcpy(ptr,"ZZ", DATA_SIZE); // Escribir el string de terminación
     
     printf("Producción terminada (ZZ)\n");
     
     sem_post(semr1); // Avisar a robot 1 que hay un nuevo dato
-    sem_wait(semprod); // Esperar a que todos lean la señal de terminacion
+    sem_wait(semprod); // Esperar a que todos lean la señal de terminación
+    
+    // Cierre y desvinculación de recursos
 
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE)<0) {
         perror("Falla munmap() en productor");
         return 9;
-        // Continuar para cerrar y desvincular recursos
     }
 
     // Cerrar el descriptor de archivo de la memoria compartida
@@ -168,7 +186,7 @@ int main(int argc, char *argv[]) {
         return 10;
     }
 
-    // Cerrar los semaforos
+    // Cerrar los semáforos
     sem_close(semprod);
     sem_close(semr1);
     sem_close(semr2);
@@ -195,17 +213,17 @@ int main(int argc, char *argv[]) {
         unlink(tuberiaRobot3);
 
         if(mkfifo(tuberiaRobot1, 0666) == -1){
-            perror("Error: No se pudo crear la tuberia para el robot 1.\n");
+            perror("Error: No se pudo crear la tubería para el robot 1.\n");
             return 11;
         }
 
         if(mkfifo(tuberiaRobot2, 0666) == -1){
-            perror("Error: No se pudo crear la tuberia para el robot 2.\n");
+            perror("Error: No se pudo crear la tubería para el robot 2.\n");
             return 12;
         }
 
         if(mkfifo(tuberiaRobot3, 0666) == -1){
-            perror("Error: No se pudo crear la tuberia para el robot 3.\n");
+            perror("Error: No se pudo crear la tubería para el robot 3.\n");
             return 13;
         }
 
@@ -214,9 +232,13 @@ int main(int argc, char *argv[]) {
         int fdr3 = open(tuberiaRobot3, O_WRONLY);
 
         if (fdr1 == -1 || fdr2 == -1 || fdr3 == -1) {
-            perror("Error: No se pudo abrir la tuberia para el robot.\n");
+            perror("Error: No se pudo abrir la tubería para algún robot.\n");
             return 14;
         }
+
+        //--------------------------------------------------
+        // Envio de N a los robots a través de sus tuberías
+        //--------------------------------------------------
 
         write(fdr1, &N, sizeof(N)); // Enviar N al robot 1
         close(fdr1);
@@ -225,18 +247,25 @@ int main(int argc, char *argv[]) {
         write(fdr3, &N, sizeof(N)); // Enviar N al robot 3
         close(fdr3);
 
+        //---------------------------------------------------------------
+        // Envio de N al proceso hijo (productor) a través de la tubería
+        //---------------------------------------------------------------
 
-        //Escribir en la tuberia para hijo (productor)
+        //Escribir en la tubería para hijo (productor)
         close(fdTuberia[0]); // Cerrar el extremo de lectura
         write(fdTuberia[1],&N,sizeof(N)); // Enviar N al hijo
         printf("Enviado N a productor: %d\n", N);
         close(fdTuberia[1]); // Cerrar el extremo de escritura
 
-        // Recibir cp de los robots
+        //-------------------------------------------
+        // Desúes de terminar la producción
+        //-------------------------------------------
+        
+        // Recibir la cantidad de productos (cp) de los robots
         int cp1, cp2, cp3;
         fdr1 = open(tuberiaRobot1, O_RDONLY);
         if (fdr1 == -1) {
-            perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
+            perror("Error: No se pudo abrir la tubería para el robot 1.\n");
             return 15;
         }
         read(fdr1, &cp1, sizeof(cp1)); // Recibir cp del robot 1
@@ -244,7 +273,7 @@ int main(int argc, char *argv[]) {
 
         fdr2 = open(tuberiaRobot2, O_RDONLY);
         if (fdr2 == -1) {
-            perror("Error: No se pudo abrir la tuberia para el robot 2.\n");
+            perror("Error: No se pudo abrir la tubería para el robot 2.\n");
             return 16;
         }
         read(fdr2, &cp2, sizeof(cp2)); // Recibir cp del robot 2
@@ -252,7 +281,7 @@ int main(int argc, char *argv[]) {
 
         fdr3 = open(tuberiaRobot3, O_RDONLY);
         if (fdr3 == -1) {
-            perror("Error: No se pudo abrir la tuberia para el robot 3.\n");
+            perror("Error: No se pudo abrir la tubería para el robot 3.\n");
             return 17;
         }
         read(fdr3, &cp3, sizeof(cp3)); // Recibir cp del robot 3
