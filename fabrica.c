@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     // Verificacion de que N es par
     if (atoi(argv[1]) % 2 != 0) {
         perror("Error: N debe ser un número par.\n");
-        return 4;
+        return 3;
     }
 
     printf("N validado correctamente.\n");
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     int fdTuberia[2];
     if (pipe(fdTuberia) < 0) {
         perror("Fallo de pipe al crear tuberia.\n");
-        return 5;
+        return 4;
     } else {
         printf("Tuberia creada correctamente.\n");
     }
@@ -63,20 +63,20 @@ int main(int argc, char *argv[]) {
     fdMemoria = shm_open(path, O_CREAT | O_RDWR, 0666);
     if (fdMemoria == -1) {
             perror("Error: No se pudo crear la memoria compartida.\n");
-            return 6;
+            return 5;
         }
         
     // Configurar el tamaño de la memoria compartida
     if (ftruncate(fdMemoria, DATA_SIZE) == -1) {
             perror("Error: No se pudo configurar el tamaño de la memoria compartida.\n");
-            return 7;
+            return 6;
         }
         
     // Mapear la memoria compartida
     ptr = mmap(0, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fdMemoria, 0);
     if (ptr == MAP_FAILED) {
             perror("Error: No se pudo mapear la memoria compartida.\n");
-            return 8;
+            return 7;
         }
         
     // Crear proceso productor
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
         // Verificar que los semaforos se hayan creado correctamente
         if (semprod == SEM_FAILED || semr1 == SEM_FAILED || semr2 == SEM_FAILED || semr3 == SEM_FAILED) {
             perror("Falla sem_open en productor");
-            return 1;
+            return 8;
         }
         
         srand(time(NULL)); // Inicializar la semilla para la generación de números aleatorios
@@ -160,12 +160,14 @@ int main(int argc, char *argv[]) {
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE)<0) {
         perror("Falla munmap() en productor");
+        return 9;
         // Continuar para cerrar y desvincular recursos
     }
 
     // Cerrar el descriptor de archivo de la memoria compartida
     if (close(fdMemoria)<0) {
         perror("Falla close(fd) en productor");
+        return 10;
     }
 
     // Cerrar los semaforos
@@ -196,17 +198,17 @@ int main(int argc, char *argv[]) {
 
         if(mkfifo(tuberiaRobot1, 0666) == -1){
             perror("Error: No se pudo crear la tuberia para el robot 1.\n");
-            return 9;
+            return 11;
         }
 
         if(mkfifo(tuberiaRobot2, 0666) == -1){
             perror("Error: No se pudo crear la tuberia para el robot 2.\n");
-            return 10;
+            return 12;
         }
 
         if(mkfifo(tuberiaRobot3, 0666) == -1){
             perror("Error: No se pudo crear la tuberia para el robot 3.\n");
-            return 11;
+            return 13;
         }
 
         int fdr1 = open(tuberiaRobot1, O_WRONLY);
@@ -215,7 +217,7 @@ int main(int argc, char *argv[]) {
 
         if (fdr1 == -1 || fdr2 == -1 || fdr3 == -1) {
             perror("Error: No se pudo abrir la tuberia para el robot.\n");
-            return 12;
+            return 14;
         }
 
         write(fdr1, &N, sizeof(N)); // Enviar N al robot 1
@@ -237,7 +239,7 @@ int main(int argc, char *argv[]) {
         fdr1 = open(tuberiaRobot1, O_RDONLY);
         if (fdr1 == -1) {
             perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
-            return 12;
+            return 15;
         }
         read(fdr1, &cp1, sizeof(cp1)); // Recibir cp del robot 1
         close(fdr1);
@@ -245,7 +247,7 @@ int main(int argc, char *argv[]) {
         fdr2 = open(tuberiaRobot2, O_RDONLY);
         if (fdr2 == -1) {
             perror("Error: No se pudo abrir la tuberia para el robot 2.\n");
-            return 12;
+            return 16;
         }
         read(fdr2, &cp2, sizeof(cp2)); // Recibir cp del robot 2
         close(fdr2);
@@ -253,7 +255,7 @@ int main(int argc, char *argv[]) {
         fdr3 = open(tuberiaRobot3, O_RDONLY);
         if (fdr3 == -1) {
             perror("Error: No se pudo abrir la tuberia para el robot 3.\n");
-            return 12;
+            return 17;
         }
         read(fdr3, &cp3, sizeof(cp3)); // Recibir cp del robot 3
         close(fdr3);

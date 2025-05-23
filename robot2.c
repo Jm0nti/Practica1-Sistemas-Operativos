@@ -36,7 +36,7 @@ int main() {
         sem_close(semr1);
         sem_close(semr2);
         sem_close(semr3);
-        return 1;
+        return 2;
     }
 
     // Mapear la memoria compartida
@@ -74,7 +74,7 @@ int main() {
     int fdr2 = open(tuberiaRobot2, O_RDONLY);
     if (fdr2 == -1) {
         perror("Error: No se pudo abrir la tuberia para el robot 2.\n");
-        return 12;
+        return 4;
     }
 
     // Leer N desde la tuberia
@@ -128,7 +128,7 @@ int main() {
     fdr2 = open(tuberiaRobot2, O_WRONLY);
     if (fdr2 == -1) {
         perror("Error: No se pudo abrir la tuberia para el robot 1.\n");
-        return 12;
+        return 5;
     }
 
     
@@ -139,11 +139,13 @@ int main() {
     // "Desmapear" el area de memoria
     if (munmap(ptr, DATA_SIZE) == -1) {
         perror("Falla munmap() en consumidor");
+        return 6;
     }
 
     // Cerrar el descriptor de archivo
     if (close(fd) == -1) {
         perror("Falla close(fd) en consumidor");
+        return 7;
     }
 
     // Cerrar los semaforos
