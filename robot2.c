@@ -8,7 +8,7 @@
 
 int main() {
     const char *path = "/CINTA";
-    const int DATA_SIZE = sizeof(char)*2; // Debe ser el mismo tamano que en el productor
+    const int DATA_SIZE = sizeof(char)*2; 
     const char *nomsemprod = "/SEMPROD";
     const char *nomsemr1 = "/SEMR1";
     const char *nomsemr2 = "/SEMR2";
@@ -111,12 +111,10 @@ int main() {
             printf("Leido: %s\n", buffer);
     
             cp++;
-            // "Eliminar" el contenido de la memoria compartida escribiendo ceros (o lo que desees)
-            // Esto es para cumplir con el requisito de "eliminarlo del espacio de memoria".
-            memset(ptr, 0, DATA_SIZE); 
-            // printf("Memoria compartida limpiada.\n"); // Para depuracion
 
-            sleep(1); // Simular trabajo
+            memset(ptr, 0, DATA_SIZE); // Limpiar buffer de memoria compartida
+
+            sleep(1); 
     
             sem_post(semprod); // Avisar al productor que el slot esta libre
 

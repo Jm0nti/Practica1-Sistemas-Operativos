@@ -8,13 +8,11 @@
 
 int main() {
     const char *path = "/CINTA";
-    const int DATA_SIZE = sizeof(char)*2; // Debe ser el mismo tamano que en el productor
+    const int DATA_SIZE = sizeof(char)*2; 
     const char *nomsemprod = "/SEMPROD";
     const char *nomsemr1 = "/SEMR1";
     const char *nomsemr2 = "/SEMR2";
 
-    //const int num_items_to_consume = 3; // HACER TUBERIA PARA LEER N DE fabrica.c
-    /* ------- NO ENTIENDO ESA LINEA 15 (la de arriba), CREO QUE SOBRA  (?) ----------*/
 
     // Abrir semaforos 
     sem_t *semprod = sem_open(nomsemprod, O_CREAT, 0666, 0);
@@ -110,12 +108,10 @@ int main() {
             printf("Leido: %s\n", buffer);
     
             cp++;
-            // "Eliminar" el contenido de la memoria compartida escribiendo ceros (o lo que desees)
-            // Esto es para cumplir con el requisito de "eliminarlo del espacio de memoria".
-            memset(ptr, 0, DATA_SIZE); 
-            // printf("Memoria compartida limpiada.\n"); // Para depuracion
 
-            sleep(1); // Simular trabajo
+            memset(ptr, 0, DATA_SIZE); // Limpiar buffer de memoria compartida
+
+            sleep(1); 
     
             sem_post(semprod); // Avisar al productor que el slot esta libre
 
