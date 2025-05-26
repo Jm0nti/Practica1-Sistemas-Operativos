@@ -176,7 +176,8 @@ int main(int argc, char *argv[]) {
         // ya que ptr no necesariamente estará terminado en null si DATA_SIZE
         // es exactamente la longitud del string sin el terminador ('\0').
         printf("Producido: %.*s\n", DATA_SIZE, (char*)ptr);
-        
+
+        //"Descomentar la siguiente linea para mejorar la visualización de la ejecución
         sleep(1); // Simular trabajo
 
         if (productos[indice] == "AB") { // Avisar a robot 1 que hay un nuevo producto para él
