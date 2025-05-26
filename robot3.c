@@ -146,7 +146,7 @@ int main() {
         
         }else{ //Si los productos son BC, actúa
             
-            printf("Leido: %s\n", buffer);
+            printf("Empacado: %s\n", buffer);
     
             cp++;
 

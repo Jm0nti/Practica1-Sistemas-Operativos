@@ -38,6 +38,11 @@ int main(int argc, char *argv[]) {
         return 3;
     }
 
+    if (atoi(argv[1]) <= 0) {
+        perror("Error: N debe ser mayor que cero.\n");
+        return 4;
+    }
+
     printf("padre: N validado correctamente.\n");
 
     // Descriptores de lectura y escritura tubería anonima
@@ -62,7 +67,7 @@ int main(int argc, char *argv[]) {
     // Puntero al area de memoria compartida
     void *ptr;
     // Eliminar la memoria compartida si ya existe
-    if (shm_unlink(path) == -1) {
+    if (shm_unlink(path) == -1 && errno != ENOENT) {
         perror("Error: No se pudo eliminar la memoria compartida.\n");
         return 19;
     }
@@ -205,6 +210,7 @@ int main(int argc, char *argv[]) {
         }
     
     memcpy(ptr,"ZZ", DATA_SIZE); // Escribir el string de terminación
+    
     
     printf("Producción terminada (ZZ)\n");
     
