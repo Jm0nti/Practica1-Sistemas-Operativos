@@ -156,7 +156,7 @@ int main() {
 
             memset(ptr, 0, DATA_SIZE); // Limpiar buffer de memoria compartida
 
-            sleep(1); 
+            //sleep(1); //"Descomentar la linea para mejorar la visualización de la ejecución
     
             if (sem_post(semprod) == -1) { // Avisar al productor que el espacio de memoria esta libre
                 perror("Falla sem_post(semprod) en robot");
